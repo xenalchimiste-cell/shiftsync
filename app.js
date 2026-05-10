@@ -230,12 +230,18 @@ function checkReminders() {
     if (window.Notification && Notification.permission !== 'granted') return;
 
     const now = new Date();
-    const twentyFourHoursFromNow = new Date(now.getTime() + 24 * 60 * 60 * 1000);
-
     let updated = false;
+
     state.shifts.forEach(shift => {
-        const shiftStart = new Date(`${shift.date}T${shift.start}`);
-        if (shiftStart > now && shiftStart <= twentyFourHoursFromNow && !shift.reminded) {
+        // Date du shift
+        const [year, month, day] = shift.date.split('-').map(Number);
+        const shiftStart = new Date(year, month - 1, day, ...shift.start.split(':').map(Number));
+        
+        // Date du rappel (la veille à 20:30)
+        const reminderDate = new Date(year, month - 1, day - 1, 20, 30, 0);
+
+        // Si on a dépassé l'heure du rappel ET qu'on n'a pas encore passé l'heure du shift
+        if (now >= reminderDate && now < shiftStart && !shift.reminded) {
             showNotification(shift);
             shift.reminded = true;
             updated = true;
@@ -248,16 +254,20 @@ function checkReminders() {
 }
 
 function showNotification(shift, isTest = false) {
-    const title = isTest ? 'Test ShiftSync ✅' : 'Rappel Travail 🔔';
-    const body = isTest ? 'Ceci est une notification de test.' : `Ton service "${shift.note || 'Travail'}" commence demain à ${shift.start}.`;
+    const title = isTest ? 'Test ShiftSync ✅' : 'Rappel Travail Demain 🔔';
+    const body = isTest ? 'Ceci est une notification de test persistante.' : `Demain : service "${shift.note || 'Travail'}" de ${shift.start} à ${shift.end}.`;
     
     const options = {
         body: body,
         icon: 'icons/icon-192.png',
         badge: 'icons/icon-192.png',
-        vibrate: [200, 100, 200],
+        vibrate: [200, 100, 200, 100, 200],
         tag: isTest ? 'test' : 'shift-' + shift.id,
-        renotify: true
+        renotify: true,
+        requireInteraction: true, // Force la notification à rester jusqu'à action de l'utilisateur
+        data: {
+            url: window.location.href
+        }
     };
 
     // iPhone requires using the Service Worker for notifications
