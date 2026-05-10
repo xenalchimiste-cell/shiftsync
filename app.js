@@ -254,17 +254,24 @@ function checkReminders() {
 }
 
 function showNotification(shift, isTest = false) {
-    const title = isTest ? 'Test ShiftSync ✅' : 'Rappel Travail Demain 🔔';
-    const body = isTest ? 'Ceci est une notification de test persistante.' : `Demain : service "${shift.note || 'Travail'}" de ${shift.start} à ${shift.end}.`;
+    const [year, month, day] = shift.date.split('-').map(Number);
+    const dateObj = new Date(year, month - 1, day);
+    const fullDate = dateObj.toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long' });
+
+    const title = isTest ? 'Test ShiftSync ✅' : `🚨 Rappel : Travail le ${day}/${month}`;
+    const body = isTest ? 
+        'Ceci est un test de rappel persistant.' : 
+        `Le ${fullDate} : ton service commence à ${shift.start} (jusqu'à ${shift.end}).`;
     
     const options = {
         body: body,
-        icon: 'icons/icon-192.png',
+        icon: 'icons/icon-512.png',
         badge: 'icons/icon-192.png',
-        vibrate: [200, 100, 200, 100, 200],
+        vibrate: [500, 110, 500, 110, 450, 110, 200, 110, 170, 40, 450, 110, 200, 110, 170, 40], // Vibreur plus agressif
         tag: isTest ? 'test' : 'shift-' + shift.id,
         renotify: true,
-        requireInteraction: true, // Force la notification à rester jusqu'à action de l'utilisateur
+        requireInteraction: true, // Garde la notification affichée
+        silent: false,
         data: {
             url: window.location.href
         }
