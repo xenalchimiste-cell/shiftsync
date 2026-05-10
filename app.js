@@ -254,14 +254,19 @@ function checkReminders() {
 }
 
 function showNotification(shift, isTest = false) {
-    const [year, month, day] = shift.date.split('-').map(Number);
-    const dateObj = new Date(year, month - 1, day);
-    const fullDate = dateObj.toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long' });
-
-    const title = isTest ? 'Test ShiftSync ✅' : `🚨 Rappel : Travail le ${day}/${month}`;
-    const body = isTest ? 
-        'Ceci est un test de rappel persistant.' : 
-        `Le ${fullDate} : ton service commence à ${shift.start} (jusqu'à ${shift.end}).`;
+    let title, body;
+    
+    if (isTest) {
+        title = 'Test ShiftSync ✅';
+        body = 'Ceci est un test de rappel persistant avec le nouveau vibreur.';
+    } else {
+        const [year, month, day] = shift.date.split('-').map(Number);
+        const dateObj = new Date(year, month - 1, day);
+        const fullDate = dateObj.toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long' });
+        
+        title = `🚨 Rappel : Travail le ${day}/${month}`;
+        body = `Le ${fullDate} : ton service commence à ${shift.start} (jusqu'à ${shift.end}).`;
+    }
     
     const options = {
         body: body,
