@@ -1,4 +1,4 @@
-// ShiftSync App Logic
+// ShiftSync App Logic - 100% Local Version
 
 const state = {
     currentDate: new Date(),
@@ -16,17 +16,24 @@ const closeBtn = document.getElementById('close-modal');
 const shiftForm = document.getElementById('shift-form');
 const prevMonthBtn = document.getElementById('prev-month');
 const nextMonthBtn = document.getElementById('next-month');
+const testNotifyBtn = document.getElementById('test-notify-btn');
 
 // Initialize
 function init() {
     renderCalendar();
     renderShifts();
     updateHeader();
-    initOneSignal(); // New: Initialize OneSignal
+    
+    // Check reminders periodically
+    setInterval(checkReminders, 60000); // Every minute
     checkReminders();
-
-    // Check reminders every hour if app is open
-    setInterval(checkReminders, 3600000);
+    
+    // PWA Service Worker Registration
+    if ('serviceWorker' in navigator) {
+        navigator.serviceWorker.register('sw.js')
+            .then(() => console.log('Service Worker Registered'))
+            .catch(err => console.log('SW registration failed', err));
+    }
 
     // Navigation events
     prevMonthBtn.onclick = () => {
@@ -34,39 +41,33 @@ function init() {
         updateHeader();
         renderCalendar();
     };
-
+    
     nextMonthBtn.onclick = () => {
         state.currentDate.setMonth(state.currentDate.getMonth() + 1);
         updateHeader();
         renderCalendar();
     };
 
-    // PWA Service Worker Registration
-    if ('serviceWorker' in navigator) {
-        navigator.serviceWorker.register('sw.js')
-            .then(() => console.log('Service Worker Registered'))
-            .catch(err => console.log('SW registration failed', err));
-    }
+    testNotifyBtn.onclick = () => {
+        requestPermissionAndTest();
+    };
 }
 
 function updateHeader() {
     const options = { month: 'long', year: 'numeric' };
     monthDisplay.textContent = state.currentDate.toLocaleDateString('fr-FR', options);
-
+    
     const dayOptions = { weekday: 'long', day: 'numeric', month: 'long' };
     dayDisplay.textContent = new Date().toLocaleDateString('fr-FR', dayOptions);
 }
 
 function renderCalendar() {
     calendarGrid.innerHTML = '';
-
     const year = state.currentDate.getFullYear();
     const month = state.currentDate.getMonth();
-
     const firstDay = new Date(year, month, 1).getDay();
     const daysInMonth = new Date(year, month + 1, 0).getDate();
-
-    // Add day headers
+    
     const days = ['Lun', 'Mar', 'Mer', 'Jeu', 'Ven', 'Sam', 'Dim'];
     days.forEach(day => {
         const header = document.createElement('div');
@@ -75,33 +76,28 @@ function renderCalendar() {
         calendarGrid.appendChild(header);
     });
 
-    // Offset for Monday start
     let offset = firstDay === 0 ? 6 : firstDay - 1;
-
-    // Previous month padding
     for (let i = 0; i < offset; i++) {
         const cell = document.createElement('div');
         cell.className = 'calendar-cell other-month';
         calendarGrid.appendChild(cell);
     }
 
-    // Days of month
     const today = new Date();
     for (let d = 1; d <= daysInMonth; d++) {
         const cell = document.createElement('div');
         cell.className = 'calendar-cell';
         cell.textContent = d;
-
         const cellDateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
-
+        
         if (today.getDate() === d && today.getMonth() === month && today.getFullYear() === year) {
             cell.classList.add('current');
         }
-
+        
         if (state.shifts.some(s => s.date === cellDateStr)) {
             cell.classList.add('has-shift');
         }
-
+        
         cell.onclick = () => openModal(cellDateStr);
         calendarGrid.appendChild(cell);
     }
@@ -109,8 +105,6 @@ function renderCalendar() {
 
 function renderShifts() {
     shiftsList.innerHTML = '';
-
-    // Sort shifts by date and time
     const sortedShifts = [...state.shifts]
         .filter(s => new Date(`${s.date}T${s.start}`) >= new Date().setHours(0, 0, 0, 0))
         .sort((a, b) => new Date(`${a.date}T${a.start}`) - new Date(`${b.date}T${b.start}`));
@@ -123,9 +117,8 @@ function renderShifts() {
     sortedShifts.forEach(shift => {
         const dateObj = new Date(shift.date);
         const dateStr = dateObj.toLocaleDateString('fr-FR', { weekday: 'short', day: 'numeric', month: 'short' });
-
         const duration = calculateDuration(shift.start, shift.end);
-
+        
         const card = document.createElement('div');
         card.className = 'shift-card';
         card.innerHTML = `
@@ -157,13 +150,10 @@ function deleteShift(id) {
 function calculateDuration(start, end) {
     const [h1, m1] = start.split(':').map(Number);
     const [h2, m2] = end.split(':').map(Number);
-
     let diff = (h2 * 60 + m2) - (h1 * 60 + m1);
-    if (diff < 0) diff += 24 * 60; // Handle overnight shifts
-
+    if (diff < 0) diff += 24 * 60;
     const hours = Math.floor(diff / 60);
     const mins = diff % 60;
-
     return mins > 0 ? `${hours}h${mins}` : `${hours}h`;
 }
 
@@ -171,6 +161,11 @@ function calculateDuration(start, end) {
 function openModal(dateStr = '') {
     if (dateStr) document.getElementById('shift-date').value = dateStr;
     modal.classList.add('active');
+    
+    // Request permission silently when opening modal if not granted
+    if (Notification.permission === 'default') {
+        Notification.requestPermission();
+    }
 }
 
 function closeModal() {
@@ -187,7 +182,7 @@ window.onclick = (e) => {
 
 shiftForm.onsubmit = (e) => {
     e.preventDefault();
-
+    
     const newShift = {
         id: Date.now(),
         date: document.getElementById('shift-date').value,
@@ -196,41 +191,30 @@ shiftForm.onsubmit = (e) => {
         note: document.getElementById('shift-note').value,
         reminded: false
     };
-
+    
     state.shifts.push(newShift);
     localStorage.setItem('shifts', JSON.stringify(state.shifts));
-
+    
     renderCalendar();
     renderShifts();
     closeModal();
-
-    // Immediate check for reminders if added for tomorrow
     checkReminders();
 };
 
-// OneSignal Integration
-async function initOneSignal() {
-    window.OneSignalDeferred = window.OneSignalDeferred || [];
-    OneSignalDeferred.push(async function (OneSignal) {
-        await OneSignal.init({
-            appId: "03732bee-1989-4c19-8a03-e96b8fff650b", // REMPLACER PAR TON APP ID ONESIGNAL
-            safari_web_id: "TON_SAFARI_ID_ICI", // OPTIONNEL POUR SAFARI
-            notifyButton: {
-                enable: true,
-            },
-            allowLocalhostAsSecureOrigin: true,
-        });
-    });
-}
-
 // Notification Logic
-function requestNotificationPermission() {
-    // If OneSignal is active, it handles permissions
-    if (window.OneSignal) return;
-
-    if ('Notification' in window) {
-        Notification.requestPermission();
+function requestPermissionAndTest() {
+    if (!('Notification' in window)) {
+        alert("Ce navigateur ne supporte pas les notifications.");
+        return;
     }
+
+    Notification.requestPermission().then(permission => {
+        if (permission === 'granted') {
+            showNotification({ note: 'Test de ShiftSync', start: 'Maintenant' }, true);
+        } else {
+            alert("Permission refusée. Vérifie les réglages de ton téléphone.");
+        }
+    });
 }
 
 function checkReminders() {
@@ -239,29 +223,45 @@ function checkReminders() {
     const now = new Date();
     const twentyFourHoursFromNow = new Date(now.getTime() + 24 * 60 * 60 * 1000);
 
+    let updated = false;
     state.shifts.forEach(shift => {
         const shiftStart = new Date(`${shift.date}T${shift.start}`);
-
-        // If shift starts in less than 24h and we haven't reminded yet
+        
+        // Reminder 24h before
         if (shiftStart > now && shiftStart <= twentyFourHoursFromNow && !shift.reminded) {
             showNotification(shift);
             shift.reminded = true;
+            updated = true;
         }
     });
-
-    localStorage.setItem('shifts', JSON.stringify(state.shifts));
+    
+    if (updated) {
+        localStorage.setItem('shifts', JSON.stringify(state.shifts));
+    }
 }
 
-function showNotification(shift) {
+function showNotification(shift, isTest = false) {
+    const title = isTest ? 'Test ShiftSync ✅' : 'Rappel Travail 🔔';
+    const body = isTest ? 'Ceci est une notification de test.' : `Ton service "${shift.note || 'Travail'}" commence demain à ${shift.start}.`;
+    
     const options = {
-        body: `Votre service "${shift.note || 'Travail'}" commence demain à ${shift.start}.`,
+        body: body,
         icon: 'icons/icon-192.png',
         badge: 'icons/icon-192.png',
-        vibrate: [200, 100, 200]
+        vibrate: [200, 100, 200],
+        tag: isTest ? 'test' : 'shift-' + shift.id,
+        renotify: true
     };
 
-    new Notification('Rappel ShiftSync 🔔', options);
+    // Use Service Worker to show notification for better reliability
+    if ('serviceWorker' in navigator && navigator.serviceWorker.controller) {
+        navigator.serviceWorker.ready.then(registration => {
+            registration.showNotification(title, options);
+        });
+    } else {
+        new Notification(title, options);
+    }
 }
 
-// Initialize on load
+// Initialize
 init();
