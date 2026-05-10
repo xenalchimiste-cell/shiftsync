@@ -1,4 +1,4 @@
-// ShiftSync App Logic - 100% Local Version
+// ShiftSync App Logic - 100% Local Version (Pro Mobile Optimized)
 
 const state = {
     currentDate: new Date(),
@@ -24,14 +24,18 @@ function init() {
     renderShifts();
     updateHeader();
     
-    // Check reminders periodically
-    setInterval(checkReminders, 60000); // Every minute
+    setInterval(checkReminders, 60000);
     checkReminders();
     
-    // PWA Service Worker Registration
     if ('serviceWorker' in navigator) {
-        navigator.serviceWorker.register('sw.js')
-            .then(() => console.log('Service Worker Registered'))
+        navigator.serviceWorker.register('sw.js', { scope: './' })
+            .then(reg => {
+                console.log('Service Worker Registered', reg);
+                // Ensure the service worker is active
+                if (reg.active) {
+                    console.log('Service Worker Active');
+                }
+            })
             .catch(err => console.log('SW registration failed', err));
     }
 
@@ -162,8 +166,8 @@ function openModal(dateStr = '') {
     if (dateStr) document.getElementById('shift-date').value = dateStr;
     modal.classList.add('active');
     
-    // Request permission silently when opening modal if not granted
-    if (Notification.permission === 'default') {
+    // Simple permission request attempt
+    if (window.Notification && Notification.permission === 'default') {
         Notification.requestPermission();
     }
 }
@@ -201,24 +205,29 @@ shiftForm.onsubmit = (e) => {
     checkReminders();
 };
 
-// Notification Logic
+// Robust Notification Logic
 function requestPermissionAndTest() {
-    if (!('Notification' in window)) {
-        alert("Ce navigateur ne supporte pas les notifications.");
+    // On iOS, Notification might be hidden in the window but available in the service worker
+    const supportsNotifications = ('Notification' in window) || (navigator.serviceWorker && 'showNotification' in ServiceWorkerRegistration.prototype);
+
+    if (!supportsNotifications) {
+        alert("Ton iPhone doit être mis à jour (iOS 16.4+) et l'app ajoutée à l'écran d'accueil.");
         return;
     }
 
-    Notification.requestPermission().then(permission => {
+    const permissionRequest = window.Notification ? Notification.requestPermission() : Promise.resolve('granted');
+
+    permissionRequest.then(permission => {
         if (permission === 'granted') {
             showNotification({ note: 'Test de ShiftSync', start: 'Maintenant' }, true);
         } else {
-            alert("Permission refusée. Vérifie les réglages de ton téléphone.");
+            alert("Permission refusée. Va dans Réglages > Notifications > ShiftSync pour l'activer.");
         }
     });
 }
 
 function checkReminders() {
-    if (!('Notification' in window) || Notification.permission !== 'granted') return;
+    if (window.Notification && Notification.permission !== 'granted') return;
 
     const now = new Date();
     const twentyFourHoursFromNow = new Date(now.getTime() + 24 * 60 * 60 * 1000);
@@ -226,8 +235,6 @@ function checkReminders() {
     let updated = false;
     state.shifts.forEach(shift => {
         const shiftStart = new Date(`${shift.date}T${shift.start}`);
-        
-        // Reminder 24h before
         if (shiftStart > now && shiftStart <= twentyFourHoursFromNow && !shift.reminded) {
             showNotification(shift);
             shift.reminded = true;
@@ -253,13 +260,16 @@ function showNotification(shift, isTest = false) {
         renotify: true
     };
 
-    // Use Service Worker to show notification for better reliability
-    if ('serviceWorker' in navigator && navigator.serviceWorker.controller) {
+    // iPhone requires using the Service Worker for notifications
+    if ('serviceWorker' in navigator) {
         navigator.serviceWorker.ready.then(registration => {
             registration.showNotification(title, options);
+        }).catch(() => {
+            // Fallback for desktop
+            if (window.Notification && Notification.permission === 'granted') {
+                new Notification(title, options);
+            }
         });
-    } else {
-        new Notification(title, options);
     }
 }
 
