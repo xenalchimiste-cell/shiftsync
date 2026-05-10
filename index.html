@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>ShiftSync | Planning Pro</title>
+    <meta name="description" content="Gérez vos horaires de travail simplement avec ShiftSync.">
+    
+    <!-- PWA -->
+    <link rel="manifest" href="manifest.json">
+    <meta name="theme-color" content="#1a1a2e">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <link rel="apple-touch-icon" href="icons/icon-192.png">
+    
+    <!-- Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;700&display=swap" rel="stylesheet">
+    
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="app-container">
+        <header>
+            <div class="header-content">
+                <div class="user-info">
+                    <div class="month-nav">
+                        <button id="prev-month" class="btn-icon">&lt;</button>
+                        <h1 id="current-month">Mai 2026</h1>
+                        <button id="next-month" class="btn-icon">&gt;</button>
+                    </div>
+                    <p id="current-day">Dimanche 10 Mai</p>
+                </div>
+                <button id="add-shift-btn" class="btn-primary">
+                    <span class="icon">+</span>
+                </button>
+            </div>
+        </header>
+
+        <main>
+            <section class="calendar-section">
+                <div id="calendar-grid" class="calendar-grid">
+                    <!-- Calendar cells will be injected here -->
+                </div>
+            </section>
+
+            <section class="upcoming-section">
+                <h2>Prochains services</h2>
+                <div id="shifts-list" class="shifts-list">
+                    <!-- Shifts will be injected here -->
+                </div>
+            </section>
+        </main>
+
+        <!-- Modal for Adding Shift -->
+        <div id="shift-modal" class="modal">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h2>Ajouter un horaire</h2>
+                    <button id="close-modal" class="btn-close">&times;</button>
+                </div>
+                <form id="shift-form">
+                    <div class="form-group">
+                        <label for="shift-date">Date</label>
+                        <input type="date" id="shift-date" required>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="start-time">Début</label>
+                            <input type="time" id="start-time" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="end-time">Fin</label>
+                            <input type="time" id="end-time" required>
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label for="shift-note">Note (optionnel)</label>
+                        <input type="text" id="shift-note" placeholder="Ex: Restaurant, Bureau...">
+                    </div>
+                    <div class="notification-info">
+                        <p>🔔 Rappel 24h avant activé</p>
+                    </div>
+                    <button type="submit" class="btn-submit">Enregistrer</button>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <script src="app.js"></script>
+</body>
+</html>
