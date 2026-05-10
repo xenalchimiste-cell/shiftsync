@@ -22,7 +22,7 @@ function init() {
     renderCalendar();
     renderShifts();
     updateHeader();
-    requestNotificationPermission();
+    initOneSignal(); // New: Initialize OneSignal
     checkReminders();
     
     // Check reminders every hour if app is open
@@ -208,8 +208,26 @@ shiftForm.onsubmit = (e) => {
     checkReminders();
 };
 
+// OneSignal Integration
+async function initOneSignal() {
+    window.OneSignalDeferred = window.OneSignalDeferred || [];
+    OneSignalDeferred.push(async function(OneSignal) {
+        await OneSignal.init({
+            appId: "TON_APP_ID_ICI", // REMPLACER PAR TON APP ID ONESIGNAL
+            safari_web_id: "TON_SAFARI_ID_ICI", // OPTIONNEL POUR SAFARI
+            notifyButton: {
+                enable: true,
+            },
+            allowLocalhostAsSecureOrigin: true,
+        });
+    });
+}
+
 // Notification Logic
 function requestNotificationPermission() {
+    // If OneSignal is active, it handles permissions
+    if (window.OneSignal) return;
+    
     if ('Notification' in window) {
         Notification.requestPermission();
     }
